@@ -1,4 +1,4 @@
-# boot template development
+# boot-new template development
 
 Suppose we have a `tmp.foo` project and we want to make some
 templates (t1, t2, t3) for it. Here's a minimal example:
