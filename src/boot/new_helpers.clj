@@ -17,20 +17,25 @@
   "Given a template name, attempt to resolve it as a Boot template first,
   then as a Leiningen template. Return the type of template we found."
   [template-name]
+  (util/info "resolve-remote-template %s\n" template-name)
   (let [selected      (atom nil)
         failure       (atom nil)
-        boot-tmp-name (str template-name "/boot-template")
-        lein-tmp-name (str template-name "/lein-template")
+        tp (symbol template-name)
+        tp-name (name tp)
+        tp-ns   (or (namespace (symbol tp)) tp-name)
+        boot-tmp-name (str tp-ns #_template-name "/boot-template")
+        lein-tmp-name (str tp-ns #_template-name "/lein-template")
         tmp-version   (cond *template-version* *template-version*
                             *use-snapshots?*   "(0.0.0,)"
                             :else              "RELEASE")
+        _ (util/info "boot coords %s %s\n" boot-tmp-name tmp-version) ;;GAR
         output
         (with-out-str
           (binding [*err* *out*]
             (try
               (core/merge-env! :dependencies [[(symbol boot-tmp-name)
                                                tmp-version]])
-
+              (println "FOUND ["  boot-tmp-name tmp-version "]") ;;GAR
               (reset! selected :boot)
               (catch Exception e
                 (when (and *debug* (> *debug* 2))
@@ -51,10 +56,14 @@
     (when *debug*
       (println "Output from locating template:")
       (println output))
+    (println output) ;;GAR
+    (println "SELECTED: " @selected) ;;GAR
     (if @selected
-      (let [sym-name (str (name @selected) ".new." template-name)]
+      (let [sym-name (str (name @selected) ".new." tp-name #_template-name)]
+        (println "SYM NAME: " sym-name) ;;GAR
         (try
           (require (symbol sym-name))
+          (println "REQUIRED " sym-name)
           @selected
           (catch Exception e
             (when *debug*
@@ -79,16 +88,25 @@
 (defn resolve-template
   "Given a template name, resolve it to a symbol (or exit if not possible)."
   [template-name]
-  (if-let [type (try (require (symbol (str "boot.new." template-name)))
-                     :boot
-                     (catch FileNotFoundException _
-                       (resolve-remote-template template-name)))]
-    (let [the-ns (str (name type) ".new." template-name)]
-      (if-let [sym (resolve (symbol the-ns template-name))]
-        sym
-        (util/exit-error (println "Found template" template-name "but could not resolve"
-                                  (str the-ns "/" template-name) "within it."))))
-    (util/exit-error (println "Could not find template" template-name "on the classpath."))))
+  (println "TEMPLATE NAME:" (symbol template-name)) ;;GAR
+  (let [tp (symbol template-name)
+        tp-name (name tp)
+        tp-ns   (or (namespace (symbol tp)) tp-name)]
+    ;; (util/info "Name: %s, NS: %s\n" tp-name tp-ns) ;;GAR
+    (if-let [type (try (require (symbol (str "boot.new." tp-ns #_template-name)))
+                       :boot
+                       (catch FileNotFoundException _
+                         (resolve-remote-template template-name)))]
+      (do (util/info "Type: %s\n" type) ;;GAR
+          (let [the-ns (str (name type) ".new." tp-name #_template-name)
+                _ (util/info "the-ns: %s\n" the-ns)
+                sym (resolve (symbol the-ns tp-name #_template-name))]
+            (util/info "Sym: %s\n" sym) ;;GAR
+            (if-let [sym (resolve (symbol the-ns tp-name #_template-name))]
+              sym
+              (util/exit-error (println "Found template" template-name "but could not resolve"
+                                        (str the-ns "/" template-name) "within it.")))))
+      (util/exit-error (println "Could not find template" template-name "on the classpath.")))))
 
 (defn create*
   "Given a template name, a project name and list of template arguments,
