@@ -1,7 +1,21 @@
 # boot-new template development
 
+WARNING: This document assumes that the ability to have multiple
+templates per project is implemented, which is not yet the case. But
+it works for the current implementation as well, except for specifying
+`-t tmp.foo/t` as in the example below.  See the
+https://github.com/mobileink/boot-new/tree/multi[multi] branch for a
+preliminary implementation of multi-template support.
+
 Suppose we have a `tmp.foo` project and we want to make some
-templates (t1, t2, t3) for it. Here's a minimal example:
+templates (t1, t2, t3) for it, so that we can do e.g.
+
+[source,clojure]
+----
+$ boot -d boot/new new -t tmp.foo/t1 -n foo-t1
+----
+
+Here's a minimal example:
 
 [source,clojure]
 .build.boot
