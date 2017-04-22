@@ -1,0 +1,132 @@
+# boot template development
+
+Suppose we have a `tmp.foo` project and we want to make some
+templates (t1, t2, t3) for it. Here's a minimal example:
+
+[source,clojure]
+.build.boot
+----
+(def project 'tmp.foo/boot-template)
+(def version "0.1.0-SNAPSHOT")
+(set-env! :resource-paths #{"src"}
+          :dependencies   '[[org.clojure/clojure "RELEASE"]
+                            [boot/new "RELEASE"]])
+(require '[boot.new :refer [new]])
+----
+
+IMPORTANT:  The maven artifact ID for a boot-template library _must_ be `boot-template`.
+
+[source,bash]
+.project structure
+----
+├── CHANGELOG.md
+├── LICENSE
+├── README.md
+├── build.boot
+└── src
+    └── boot
+        └── new
+            ├── t1
+            │   └── t1.clj.mustache
+            ├── t1.clj
+            ├── t2
+            │   └── t2.clj.mustache
+            ├── t2.clj
+            ├── t3
+            │   └── t3.clj.mustache
+            └── t3.clj
+----
+
+IMPORTANT:  Boot templates _must_ live in a `boot.new` namespace; this means that
+your templates must go in `boot/new`, which must be in `:resource-paths` as above.
+
+`boot-new` uses the https://github.com/davidsantiago/stencil[stencil]
+template library, which is a Clojure implementation of
+https://mustache.github.io/[Mustache]; hence the `.mustache` names
+above.
+
+CAUTION: _This naming convention is optional_; you can call your
+templates whatever you want. You can also put them wherever you want
+on the classpath; for example, you could put them in `resources`, so
+long as you add it to `:resource-paths`.
+
+== the _template function_
+
+For each template, you must write a _template function_, which will
+control generation of the output, usually using stencil (mustache)
+templates.
+
+IMPORTANT: The template function must have the same name as the the
+template file in which it is defined; for example the template
+function for t1 must be defined in `boot.new.t1`:
+
+[source,clojure]
+.src/boot/new/t1.clj
+----
+(ns boot.new.t1 "docstr" [name] ...)
+ ...
+(defn t1  ...)
+----
+
+The argument passed to the template function will be the name you
+ specified as the `-n/--name` argument in the `boot new` command. The
+ template function will use the rendering mechanism of
+ https://github.com/davidsantiago/stencil[stencil], together with your
+ mustache templates, to generate output. The general structure of the
+ processing is as follows:
+
+1. Create a renderer using `renderer` function (provided by `boot-new`): `(let [render (renderer "t1") ...]...)`
+
+2. Define the data map that will be passed to the `render` function and used to fill out the templates.
+
+3. Apply the `->files` function (defined by `boot-new`) to the data
+map defined in step 2 and a list of templating "coordinates", each
+having the form `["output-file-name-string" (render "input-template-filename-string" data)]`.
+
+IMPORTANT: The string argument you pass to `renderer` will be suffixed
+to `boot/new` to form the path to be searched for templates at render
+time. (Which of course must be on the classpath.)
+
+IMPORTANT: `boot-new` projects several convenience functions you can use to define the data map:
+
+* `multi-segment` - add another segment to an ns
+* `sanitize` - replace hyphens by underscores
+* `sanitize-ns` - sanitize for namespaces
+* `name-to-path`
+* `project-name`
+
+These are defined in https://github.com/boot-clj/boot-new/blob/master/src/boot/new/templates.clj[templates.clj]
+
+For example, the template function for the built-in `app` template looks like this:
+
+[source,clojure]
+----
+(defn app
+  "An application project template."
+  [name]
+  (let [render (renderer "app")
+        main-ns (multi-segment (sanitize-ns name))
+        data {:raw-name name
+              :name (project-name name)
+              :namespace main-ns
+              :nested-dirs (name-to-path main-ns)
+              :year (year)
+              :date (date)}]
+    (println "Generating a project called" name "based on the 'app' template.")
+    (->files data
+             ["build.boot" (render "build.boot" data)]
+             ["README.md" (render "README.md" data)]
+             ["doc/intro.md" (render "intro.md" data)]
+             [".gitignore" (render "gitignore" data)]
+             [".hgignore" (render "hgignore" data)]
+             ["src/{{nested-dirs}}.clj" (render "core.clj" data)]
+             ["test/{{nested-dirs}}_test.clj" (render "test.clj" data)]
+             ["LICENSE" (render "LICENSE" data)]
+             ["CHANGELOG.md" (render "CHANGELOG.md" data)]
+             "resources/.keep" "")))
+----
+
+See https://github.com/boot-clj/boot-new/tree/master/src/boot/new for further examples.
+
+TIP: The templating logic for `boot-new` is the same as it is for
+`leiningen-new`, so you can use leiningen templates as examples.
